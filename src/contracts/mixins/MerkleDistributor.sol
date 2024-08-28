@@ -185,7 +185,8 @@ abstract contract MerkleDistributor is ClaimingInterface {
             revert InvalidProof();
         }
 
-        _setClaimed(index);
+        // @dev This function was disabled to enable multiple test claims. This should be only be used for tests and not in production.
+        // _setClaimed(index);
 
         performClaim(
             claimType,
