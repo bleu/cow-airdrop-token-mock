@@ -1,24 +1,17 @@
 import { promises as fs } from "fs";
 
+import { Contract } from "ethers";
 import { HardhatRuntimeEnvironment } from "hardhat/types";
 
 import {
-  DEFAULT_FORWARDER,
   parseCsvFile,
   computeProofs,
   removeSplitClaimFiles,
   splitClaimsAndSaveToFolder,
-  generateDeploymentProposal,
-  DeploymentProposal,
   ReducedDeploymentProposalSettings,
+  constructorInput,
+  ContractName,
 } from "../../ts";
-import {
-  defaultTokens,
-  realityModule as realityModuleAddress,
-} from "../../ts/lib/constants";
-
-import { defaultSafeDeploymentAddresses } from "./safe";
-import { getSnapshotTransactionHashes } from "./snapshot";
 
 export interface CowDeploymentArgs {
   claims: string;
@@ -29,14 +22,13 @@ export async function generateDeployment(
   { claims: claimCsv, settings: settingsJson }: CowDeploymentArgs,
   hre: HardhatRuntimeEnvironment,
   outputFolder: string,
-): Promise<[DeploymentProposal, ReducedDeploymentProposalSettings]> {
+): Promise<[Contract, ReducedDeploymentProposalSettings]> {
   const chainIdUntyped = (
     await hre.ethers.provider.getNetwork()
   ).chainId.toString();
-  if (!["1", "4", "5", "100"].includes(chainIdUntyped)) {
+  if (!["1", "4", "5", "100", "11155111"].includes(chainIdUntyped)) {
     throw new Error(`Chain id ${chainIdUntyped} not supported`);
   }
-  const chainId = chainIdUntyped as "1" | "4" | "5" | "100";
 
   console.log("Processing input files...");
   // TODO: validate settings
@@ -54,38 +46,52 @@ export async function generateDeployment(
       gnoPrice: inputSettings.virtualCowToken.gnoPrice,
       nativeTokenPrice: inputSettings.virtualCowToken.nativeTokenPrice,
       merkleRoot,
-      usdcToken: defaultTokens.usdc[chainId],
-      gnoToken: defaultTokens.gno[chainId],
-      wrappedNativeToken: defaultTokens.weth[chainId],
+      usdcToken: "0x0000000000000000000000000000000000000000",
+      gnoToken: "0x0000000000000000000000000000000000000000",
+      wrappedNativeToken: "0x0000000000000000000000000000000000000000",
     },
   };
-  const proposal = await generateDeploymentProposal(
-    settings,
-    {
-      ...defaultSafeDeploymentAddresses(chainId),
-      forwarder: DEFAULT_FORWARDER,
-    },
-    {
-      ...defaultSafeDeploymentAddresses("100"),
-      forwarder: DEFAULT_FORWARDER,
-    },
-    hre.ethers,
-  );
-  const { steps, addresses } = proposal;
+  // const proposal = await generateDeploymentProposal(
+  //   settings,
+  //   {
+  //     ...defaultSafeDeploymentAddresses(chainId),
+  //     forwarder: DEFAULT_FORWARDER,
+  //   },
+  //   {
+  //     ...defaultSafeDeploymentAddresses("100"),
+  //     forwarder: DEFAULT_FORWARDER,
+  //   },
+  //   hre.ethers,
+  // );
+  // const { steps, addresses } = proposal;
 
-  let txHashes = null;
-  if (
-    Object.keys(realityModuleAddress).includes(chainId) &&
-    settings.multisend !== undefined
-  ) {
-    console.log("Generating proposal transaction hashes...");
-    txHashes = await getSnapshotTransactionHashes(
-      steps,
-      settings.multisend,
-      chainId as keyof typeof realityModuleAddress,
-      hre.ethers.provider,
-    );
-  }
+  // let txHashes = null;
+  // if (
+  //   Object.keys(realityModuleAddress).includes(chainId) &&
+  //   settings.multisend !== undefined
+  // ) {
+  //   console.log("Generating proposal transaction hashes...");
+  //   txHashes = await getSnapshotTransactionHashes(
+  //     steps,
+  //     settings.multisend,
+  //     chainId as keyof typeof realityModuleAddress,
+  //     hre.ethers.provider,
+  //   );
+  // }
+
+  const contractDeployer = await hre.ethers.getContractFactory(
+    "CowProtocolVirtualToken",
+  );
+  const bridgedTokenDeployer = await contractDeployer.deploy(
+    ...constructorInput(ContractName.VirtualToken, {
+      ...settings.virtualCowToken,
+      realToken: "0x5Fe27BF718937CA1c4a7818D246Cd4e755C7470c",
+      usdcPrice: "0",
+      communityFundsTarget: "0x0000000000000000000000000000000000000000",
+      teamController: settings.teamController.expectedAddress as string,
+      investorFundsTarget: "0x0000000000000000000000000000000000000000",
+    }),
+  );
 
   console.log("Clearing old files...");
   await fs.rm(`${outputFolder}/addresses.json`, {
@@ -103,24 +109,24 @@ export async function generateDeployment(
   console.log("Saving generated data to file...");
   await fs.mkdir(outputFolder, { recursive: true });
   await fs.writeFile(
-    `${outputFolder}/addresses.json`,
-    JSON.stringify(addresses, undefined, 2),
+    `${outputFolder}/address.json`,
+    JSON.stringify(bridgedTokenDeployer.address, undefined, 2),
   );
-  await fs.writeFile(
-    `${outputFolder}/steps.json`,
-    JSON.stringify(steps, undefined, 2),
-  );
-  if (txHashes !== null) {
-    await fs.writeFile(
-      `${outputFolder}/txhashes.json`,
-      JSON.stringify(txHashes, undefined, 2),
-    );
-  }
+  // await fs.writeFile(
+  //   `${outputFolder}/steps.json`,
+  //   JSON.stringify(steps, undefined, 2),
+  // );
+  // if (txHashes !== null) {
+  //   await fs.writeFile(
+  //     `${outputFolder}/txhashes.json`,
+  //     JSON.stringify(txHashes, undefined, 2),
+  //   );
+  // }
   await fs.writeFile(
     `${outputFolder}/claims.json`,
     JSON.stringify(claimsWithProof),
   );
   await splitClaimsAndSaveToFolder(claimsWithProof, outputFolder);
 
-  return [proposal, settings];
+  return [bridgedTokenDeployer, settings];
 }
