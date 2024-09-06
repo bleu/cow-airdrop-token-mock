@@ -1,18 +1,20 @@
 // SPDX-License-Identifier: LGPL-3.0-or-later
 pragma solidity ^0.8.10;
 
+import "./vendored/mixins/draft-ERC20Permit.sol"
 import "./mixins/NonTransferrableErc20.sol";
 import "./mixins/Vesting.sol";
 import "./mixins/Claiming.sol";
 import "./mixins/MerkleDistributor.sol";
 import "./vendored/mixins/StorageAccessible.sol";
 
+
 /// @dev The token that manages how the CoW Protocol governance token is
 /// distributed to all different types of investors.
 /// @title CoW Protocol Virtual Token
 /// @author CoW Protocol Developers
 contract CowProtocolVirtualToken is
-    NonTransferrableErc20,
+    ERC20Permit,
     Vesting,
     Claiming,
     MerkleDistributor,
@@ -34,7 +36,7 @@ contract CowProtocolVirtualToken is
         uint256 nativeTokenPrice,
         address teamController
     )
-        NonTransferrableErc20(ERC20_NAME, ERC20_SYMBOL)
+        ERC20Permit(ERC20_NAME, ERC20_SYMBOL)
         Claiming(
             cowToken,
             communityFundsTarget,
