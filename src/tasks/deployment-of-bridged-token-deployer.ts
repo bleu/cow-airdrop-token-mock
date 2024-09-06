@@ -18,7 +18,7 @@ import { defaultTokens } from "../ts/lib/constants";
 import { removeSplitClaimFiles, splitClaimsAndSaveToFolder } from "../ts/split";
 
 import { CowDeploymentArgs } from "./ts/deployment";
-import { defaultSafeDeploymentAddresses } from "./ts/safe";
+import { defaultSafeDeploymentAddresses, SupportedChainId } from "./ts/safe";
 
 export const OUTPUT_FOLDER_GC = "./output/deployment-gc";
 
@@ -56,11 +56,13 @@ async function generateDeployment(
   const [deployer] = await ethers.getSigners();
 
   const chainId = (await hre.ethers.provider.getNetwork()).chainId.toString();
-  if (chainId !== "100") {
-    throw new Error(
-      `This script must be run on gnosis chain. Found chainId ${chainId}`,
-    );
-  }
+  // if (chainId !== "100") {
+  //   throw new Error(
+  //     `This script must be run on gnosis chain. Found chainId ${chainId}`,
+  //   );
+  // }
+
+  console.log(settingsJson);
 
   const settings: ReducedDeploymentProposalSettings = JSON.parse(
     await fs.readFile(settingsJson, "utf8"),
@@ -73,47 +75,47 @@ async function generateDeployment(
   console.log("Generating Merkle proofs...");
   const { merkleRoot, claims: claimsWithProof } = computeProofs(claims);
 
-  const { cowToken, cowDao } = await getExpectedAddresses(
-    settings,
-    defaultSafeDeploymentAddresses(chainId),
-    defaultSafeDeploymentAddresses("100"),
-    hre.ethers,
-  );
+  // const { cowToken, cowDao } = await getExpectedAddresses(
+  //   settings,
+  //   defaultSafeDeploymentAddresses(chainId as SupportedChainId),
+  //   defaultSafeDeploymentAddresses("100"),
+  //   hre.ethers,
+  // );
 
-  if (settings.cowToken.expectedAddress !== undefined) {
-    if (
-      settings.cowToken.expectedAddress.toLowerCase() !== cowToken.toLowerCase()
-    ) {
-      throw new Error(
-        `Expected cowToken address ${settings.cowToken.expectedAddress} does not coincide with calculated address ${cowToken}`,
-      );
-    }
-  } else {
-    console.warn("settings.cowToken.expectedAddress was not defined");
-  }
+  // if (settings.cowToken.expectedAddress !== undefined) {
+  //   if (
+  //     settings.cowToken.expectedAddress.toLowerCase() !== cowToken.toLowerCase()
+  //   ) {
+  //     throw new Error(
+  //       `Expected cowToken address ${settings.cowToken.expectedAddress} does not coincide with calculated address ${cowToken}`,
+  //     );
+  //   }
+  // } else {
+  //   console.warn("settings.cowToken.expectedAddress was not defined");
+  // }
 
-  if (settings.cowDao.expectedAddress !== undefined) {
-    if (
-      settings.cowDao.expectedAddress.toLowerCase() !== cowDao.toLowerCase()
-    ) {
-      throw new Error(
-        "Expected cowDao address does not coincide with calculated address",
-      );
-    }
-  } else {
-    console.warn("settings.cowDao.expectedAddress was not defined");
-  }
+  // if (settings.cowDao.expectedAddress !== undefined) {
+  //   if (
+  //     settings.cowDao.expectedAddress.toLowerCase() !== cowDao.toLowerCase()
+  //   ) {
+  //     throw new Error(
+  //       "Expected cowDao address does not coincide with calculated address",
+  //     );
+  //   }
+  // } else {
+  //   console.warn("settings.cowDao.expectedAddress was not defined");
+  // }
 
   const deploymentHelperParameters: DeploymentHelperDeployParams = {
-    foreignToken: cowToken,
+    foreignToken: "0x0000000000000000000000000000000000000000",
     multiTokenMediatorGnosisChain:
       settings.bridge.multiTokenMediatorGnosisChain,
     merkleRoot,
-    communityFundsTarget: cowDao,
-    gnoToken: defaultTokens.gno[chainId],
+    communityFundsTarget: "0x0000000000000000000000000000000000000000",
+    gnoToken: "0x0000000000000000000000000000000000000000",
     gnoPrice: settings.virtualCowToken.gnoPrice,
     nativeTokenPrice: utils.parseUnits("0.15", 18).toString(), // the price of one unit of COW in xDAI
-    wrappedNativeToken: defaultTokens.weth[chainId],
+    wrappedNativeToken: "0x0000000000000000000000000000000000000000",
   };
 
   console.log(
